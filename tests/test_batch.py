@@ -83,32 +83,17 @@ def test_upgrade_legacy_batch_json_preserves_backup_and_signal(tmp_path: Path):
     BatchMeta.model_validate(upgraded)
 
 
-def test_upgrade_legacy_batch_json_handles_malformed_legacy_payload(tmp_path: Path):
+def test_upgrade_legacy_batch_json_refuses_malformed_legacy_payload(tmp_path: Path):
     batch_dir = tmp_path / "results/E50009"
     batch_dir.mkdir(parents=True)
     malformed_payload = "not-json\nlegacy=true\n"
     (batch_dir / "batch.json").write_text(malformed_payload, encoding="utf-8")
 
-    upgraded = upgrade_legacy_batch_json(batch_dir)
+    with pytest.raises(ValueError, match="parseable JSON legacy batch"):
+        upgrade_legacy_batch_json(batch_dir)
 
-    assert (batch_dir / "batch.legacy.json").read_text(encoding="utf-8") == malformed_payload
-    assert upgraded == {
-        "experiment_id": "E50009",
-        "batch_id": "E50009",
-        "batch_type": "backfill",
-        "created_at": "1970-01-01T00:00:00+00:00",
-        "models": ["UNKNOWN"],
-        "instances": {"UNKNOWN": []},
-        "git": {"commit": None, "dirty": True},
-        "environment": {},
-        "provenance": {
-            "infra_version": "0.1.0",
-            "backfilled": True,
-            "legacy_backup": "batch.legacy.json",
-            "legacy_source": "upgraded-invalid-batch-json",
-        },
-    }
-    BatchMeta.model_validate(upgraded)
+    assert (batch_dir / "batch.json").read_text(encoding="utf-8") == malformed_payload
+    assert not (batch_dir / "batch.legacy.json").exists()
 
 
 def test_upgrade_legacy_batch_json_refuses_when_backup_exists(tmp_path: Path):
@@ -158,6 +143,25 @@ def test_upgrade_legacy_batch_json_refuses_malformed_canonical_like_text(tmp_pat
     batch_dir = tmp_path / "results/E50011"
     batch_dir.mkdir(parents=True)
     raw_text = '{"experiment_id":"E50011","batch_type":"backfill","provenance":'
+    (batch_dir / "batch.json").write_text(raw_text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="parseable JSON legacy batch"):
+        upgrade_legacy_batch_json(batch_dir)
+
+    assert (batch_dir / "batch.json").read_text(encoding="utf-8") == raw_text
+    assert not (batch_dir / "batch.legacy.json").exists()
+
+
+def test_upgrade_legacy_batch_json_refuses_mixed_legacy_and_canonical_markers(tmp_path: Path):
+    batch_dir = tmp_path / "results/E50012"
+    batch_dir.mkdir(parents=True)
+    mixed_payload = {
+        "command": "python main.py",
+        "total_trials": 10,
+        "batch_type": "backfill",
+        "provenance": {"infra_version": "0.1.0"},
+    }
+    raw_text = json.dumps(mixed_payload)
     (batch_dir / "batch.json").write_text(raw_text, encoding="utf-8")
 
     with pytest.raises(ValueError, match="does not look like a legacy batch"):

@@ -102,20 +102,13 @@ def _legacy_mapping(value: Any) -> dict[str, Any]:
 
 def _is_legacy_shaped_payload(payload: dict[str, Any]) -> bool:
     keys = set(payload)
-    if keys & LEGACY_ONLY_KEYS:
-        return True
     if keys & CANONICAL_ONLY_KEYS:
         return False
+    if keys & LEGACY_ONLY_KEYS:
+        return True
     if not keys:
         return False
     return keys <= (LEGACY_COMPAT_KEYS | LEGACY_ONLY_KEYS)
-
-
-def _looks_like_canonical_raw_text(raw_text: str) -> bool:
-    if any(f'"{key}"' in raw_text for key in CANONICAL_ONLY_KEYS):
-        return True
-    canonical_hits = sum(1 for key in CANONICAL_KEYS if f'"{key}"' in raw_text)
-    return canonical_hits >= 4
 
 
 def _canonical_backfill_payload(
@@ -174,13 +167,10 @@ def upgrade_legacy_batch_json(batch_dir: Path) -> dict[str, object]:
     try:
         parsed_payload = json.loads(raw_text)
     except json.JSONDecodeError:
-        if _looks_like_canonical_raw_text(raw_text):
-            raise ValueError(f"{target} does not look like a legacy batch; refusing upgrade")
-        legacy_payload: dict[str, Any] = {}
-    else:
-        if not isinstance(parsed_payload, dict) or not _is_legacy_shaped_payload(parsed_payload):
-            raise ValueError(f"{target} does not look like a legacy batch; refusing upgrade")
-        legacy_payload = parsed_payload
+        raise ValueError(f"{target} must be a parseable JSON legacy batch; refusing upgrade")
+    if not isinstance(parsed_payload, dict) or not _is_legacy_shaped_payload(parsed_payload):
+        raise ValueError(f"{target} does not look like a legacy batch; refusing upgrade")
+    legacy_payload = parsed_payload
 
     backup_target.write_text(raw_text, encoding="utf-8")
 
