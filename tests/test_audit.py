@@ -1,5 +1,4 @@
 from pathlib import Path
-from subprocess import run
 
 from research_infra.audit import audit_results_tree
 

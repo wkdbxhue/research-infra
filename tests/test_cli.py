@@ -49,3 +49,45 @@ def test_cli_freeze_command(tmp_path: Path):
     )
     assert result.returncode == 0
     assert (tmp_path / "results/project_freeze.yml").exists()
+
+
+def test_cli_audit_command():
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "audit",
+            "--workspace",
+            "/home/research-infra/tests/fixtures/minimal_project",
+            "--json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+
+
+def test_cli_batch_backfill_command(tmp_path: Path):
+    batch_dir = tmp_path / "results" / "E50001"
+    batch_dir.mkdir(parents=True)
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert (batch_dir / "batch.json").exists()
