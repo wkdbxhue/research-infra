@@ -1,7 +1,8 @@
 from pathlib import Path
 
 
-DOC = Path("/home/research-infra/docs/contract.md")
+ROOT = Path(__file__).resolve().parents[1]
+DOC = ROOT / "docs" / "contract.md"
 
 
 def test_contract_doc_contains_required_sections():
