@@ -1,0 +1,7 @@
+{
+  "objective": 123.0,
+  "status": "ok",
+  "validation": {
+    "is_feasible": true
+  }
+}
