@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-README = Path("/home/research-infra/README.md")
+README = Path(__file__).resolve().parents[1] / "README.md"
 
 
 def test_readme_lists_phase1_commands_and_non_goals():
