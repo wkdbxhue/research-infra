@@ -155,6 +155,39 @@ def test_cli_batch_backfill_command(tmp_path: Path):
     }
 
 
+def test_cli_batch_backfill_ignores_non_directory_entries(tmp_path: Path):
+    results_root = tmp_path / "results"
+    results_root.mkdir(parents=True)
+    (results_root / "E50014_driver.log").write_text("driver log\n", encoding="utf-8")
+
+    batch_dir = results_root / "E50014"
+    batch_dir.mkdir()
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert (results_root / "E50014_driver.log").read_text(encoding="utf-8") == "driver log\n"
+    payload = json.loads((batch_dir / "batch.json").read_text(encoding="utf-8"))
+    BatchMeta.model_validate(payload)
+    assert payload["experiment_id"] == "E50014"
+
+
 def test_cli_batch_backfill_omits_invalid_upgrade_without_flag(tmp_path: Path):
     batch_dir = tmp_path / "results" / "E50006"
     batch_dir.mkdir(parents=True)

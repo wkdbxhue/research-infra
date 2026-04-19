@@ -58,6 +58,8 @@ def main() -> int:
     if args.command == "batch" and args.batch_command == "backfill":
         results_root = Path(args.workspace) / args.results_root
         for batch_dir in sorted(results_root.glob("E*")):
+            if not batch_dir.is_dir():
+                continue
             batch_json = batch_dir / "batch.json"
             if not batch_json.exists():
                 backfill_batch_json(batch_dir, models=["UNKNOWN"], instances={"UNKNOWN": []})
