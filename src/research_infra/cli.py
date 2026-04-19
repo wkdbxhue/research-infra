@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from research_infra.audit import audit_results_tree
-from research_infra.batch import backfill_batch_json
+from research_infra.batch import backfill_batch_json, read_batch_json, upgrade_legacy_batch_json
 from research_infra.cache import rebuild_duckdb_cache
 from research_infra.workspace import init_workspace, write_freeze_file
 
@@ -32,6 +32,7 @@ def main() -> int:
     backfill_parser = batch_sub.add_parser("backfill")
     backfill_parser.add_argument("--workspace", required=True)
     backfill_parser.add_argument("--results-root", required=True)
+    backfill_parser.add_argument("--upgrade-invalid", action="store_true")
 
     freeze_parser = sub.add_parser("freeze")
     freeze_parser.add_argument("--workspace", required=True)
@@ -57,8 +58,12 @@ def main() -> int:
     if args.command == "batch" and args.batch_command == "backfill":
         results_root = Path(args.workspace) / args.results_root
         for batch_dir in sorted(results_root.glob("E*")):
-            if not (batch_dir / "batch.json").exists():
+            batch_json = batch_dir / "batch.json"
+            if not batch_json.exists():
                 backfill_batch_json(batch_dir, models=["UNKNOWN"], instances={"UNKNOWN": []})
+                continue
+            if args.upgrade_invalid and read_batch_json(batch_dir) is None:
+                upgrade_legacy_batch_json(batch_dir)
         return 0
     if args.command == "freeze":
         write_freeze_file(Path(args.workspace), args.policy)

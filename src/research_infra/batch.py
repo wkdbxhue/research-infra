@@ -3,11 +3,16 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 import fcntl
 
+from research_infra.schema import BatchMeta
 
 EID_RE = re.compile(r"^E(\d{5})$")
+INFRA_VERSION = "0.1.0"
+EPOCH_TIMESTAMP = "1970-01-01T00:00:00+00:00"
+LEGACY_BACKUP_NAME = "batch.legacy.json"
 
 
 def allocate_experiment_id(results_root: Path, *, start: int = 50001) -> str:
@@ -28,16 +33,111 @@ def write_batch_json(target: Path, payload: dict[str, object]) -> None:
     target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def backfill_batch_json(batch_dir: Path, *, models: list[str], instances: dict[str, list[str]]) -> dict[str, object]:
-    payload = {
-        "experiment_id": batch_dir.name,
-        "batch_id": batch_dir.name,
+def read_batch_json(batch_dir: Path) -> dict[str, object] | None:
+    target = batch_dir / "batch.json"
+    if not target.exists():
+        return None
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+        BatchMeta.model_validate(payload)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
+    return payload
+
+
+def _valid_eid(value: Any) -> str | None:
+    if isinstance(value, str) and EID_RE.match(value):
+        return value
+    return None
+
+
+def _usable_models(value: Any) -> list[str] | None:
+    if not isinstance(value, list):
+        return None
+    models = [item for item in value if isinstance(item, str) and item]
+    return models or None
+
+
+def _usable_instances(value: Any) -> dict[str, list[str]] | None:
+    if not isinstance(value, dict):
+        return None
+    instances: dict[str, list[str]] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not key:
+            continue
+        if not isinstance(item, list):
+            continue
+        items = [entry for entry in item if isinstance(entry, str)]
+        instances[key] = items
+    return instances or None
+
+
+def _legacy_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _canonical_backfill_payload(
+    batch_dir: Path,
+    *,
+    models: list[str],
+    instances: dict[str, list[str]],
+    legacy_payload: dict[str, Any] | None = None,
+) -> dict[str, object]:
+    legacy_payload = legacy_payload or {}
+    legacy_git = _legacy_mapping(legacy_payload.get("git"))
+    git_payload: dict[str, object] = {
+        "commit": legacy_git.get("commit") if isinstance(legacy_git.get("commit"), str) else None,
+        "dirty": legacy_git.get("dirty") if isinstance(legacy_git.get("dirty"), bool) else True,
+    }
+    if isinstance(legacy_git.get("branch"), str):
+        git_payload["branch"] = legacy_git.get("branch")
+    payload: dict[str, object] = {
+        "experiment_id": _valid_eid(legacy_payload.get("experiment_id")) or batch_dir.name,
+        "batch_id": _valid_eid(legacy_payload.get("batch_id")) or batch_dir.name,
         "batch_type": "backfill",
-        "created_at": "1970-01-01T00:00:00+00:00",
+        "created_at": legacy_payload.get("created_at")
+        if isinstance(legacy_payload.get("created_at"), str) and legacy_payload.get("created_at")
+        else EPOCH_TIMESTAMP,
         "models": models,
         "instances": instances,
-        "git": {"commit": None, "dirty": True},
-        "provenance": {"infra_version": "0.1.0", "backfilled": True},
+        "git": git_payload,
+        "environment": _legacy_mapping(legacy_payload.get("environment")),
+        "provenance": {
+            "infra_version": INFRA_VERSION,
+            "backfilled": True,
+        },
     }
+    if legacy_payload:
+        payload["provenance"]["legacy_backup"] = LEGACY_BACKUP_NAME
+        payload["provenance"]["legacy_source"] = "upgraded-invalid-batch-json"
+    return payload
+
+
+def backfill_batch_json(batch_dir: Path, *, models: list[str], instances: dict[str, list[str]]) -> dict[str, object]:
+    payload = _canonical_backfill_payload(batch_dir, models=models, instances=instances)
     write_batch_json(batch_dir / "batch.json", payload)
+    return payload
+
+
+def upgrade_legacy_batch_json(batch_dir: Path) -> dict[str, object]:
+    target = batch_dir / "batch.json"
+    if not target.exists():
+        raise FileNotFoundError(target)
+
+    raw_text = target.read_text(encoding="utf-8")
+    legacy_payload = json.loads(raw_text)
+    backup_target = batch_dir / LEGACY_BACKUP_NAME
+    if not backup_target.exists():
+        backup_target.write_text(raw_text, encoding="utf-8")
+
+    payload = _canonical_backfill_payload(
+        batch_dir,
+        models=_usable_models(legacy_payload.get("models")) or ["UNKNOWN"],
+        instances=_usable_instances(legacy_payload.get("instances")) or {"UNKNOWN": []},
+        legacy_payload=legacy_payload,
+    )
+    BatchMeta.model_validate(payload)
+    write_batch_json(target, payload)
     return payload

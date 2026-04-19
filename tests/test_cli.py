@@ -1,9 +1,16 @@
+import os
 import json
 from pathlib import Path
 from subprocess import run
 
 from research_infra.audit import audit_results_tree
 from research_infra.schema import BatchMeta
+
+
+CLI_ENV = {
+    **os.environ,
+    "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
+}
 
 
 def test_audit_accepts_minimal_fixture():
@@ -26,6 +33,7 @@ def test_cli_cache_rebuild_command(tmp_path: Path):
         ],
         check=False,
         capture_output=True,
+        env=CLI_ENV,
         text=True,
     )
     assert result.returncode == 0
@@ -36,6 +44,7 @@ def test_cli_init_command(tmp_path: Path):
         ["python", "-m", "research_infra.cli", "init", "--workspace", str(tmp_path), "--json"],
         check=False,
         capture_output=True,
+        env=CLI_ENV,
         text=True,
     )
     assert result.returncode == 0
@@ -47,6 +56,7 @@ def test_cli_freeze_command(tmp_path: Path):
         ["python", "-m", "research_infra.cli", "freeze", "--workspace", str(tmp_path), "--policy", "backfill-only"],
         check=False,
         capture_output=True,
+        env=CLI_ENV,
         text=True,
     )
     assert result.returncode == 0
@@ -67,6 +77,7 @@ def test_cli_audit_command(tmp_path: Path):
         ],
         check=False,
         capture_output=True,
+        env=CLI_ENV,
         text=True,
     )
     assert clean_result.returncode == 0
@@ -90,6 +101,7 @@ def test_cli_audit_command(tmp_path: Path):
         ],
         check=False,
         capture_output=True,
+        env=CLI_ENV,
         text=True,
     )
     assert dirty_result.returncode == 1
@@ -122,6 +134,7 @@ def test_cli_batch_backfill_command(tmp_path: Path):
         ],
         check=False,
         capture_output=True,
+        env=CLI_ENV,
         text=True,
     )
     assert result.returncode == 0
@@ -137,5 +150,88 @@ def test_cli_batch_backfill_command(tmp_path: Path):
         "models": ["UNKNOWN"],
         "instances": {"UNKNOWN": []},
         "git": {"commit": None, "dirty": True},
+        "environment": {},
         "provenance": {"infra_version": "0.1.0", "backfilled": True},
     }
+
+
+def test_cli_batch_backfill_upgrade_invalid_keeps_valid_payload(tmp_path: Path):
+    batch_dir = tmp_path / "results" / "E50003"
+    batch_dir.mkdir(parents=True)
+    valid_payload = {
+        "experiment_id": "E50003",
+        "batch_id": "E50003",
+        "batch_type": "backfill",
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "models": ["UNKNOWN"],
+        "instances": {"UNKNOWN": []},
+        "git": {"commit": None, "dirty": True},
+        "environment": {},
+        "provenance": {"infra_version": "0.1.0", "backfilled": True},
+    }
+    (batch_dir / "batch.json").write_text(json.dumps(valid_payload), encoding="utf-8")
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+            "--upgrade-invalid",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert json.loads((batch_dir / "batch.json").read_text(encoding="utf-8")) == valid_payload
+    assert not (batch_dir / "batch.legacy.json").exists()
+
+
+def test_cli_batch_backfill_upgrade_invalid_rewrites_legacy_payload(tmp_path: Path):
+    batch_dir = tmp_path / "results" / "E50004"
+    batch_dir.mkdir(parents=True)
+    legacy_payload = {
+        "experiment_id": "legacy-run",
+        "models": ["M00004"],
+        "instances": {"M00004": ["small-03"]},
+        "git": {"commit": "b" * 40, "dirty": False, "branch": "legacy"},
+        "environment": {"python": "3.11"},
+    }
+    (batch_dir / "batch.json").write_text(json.dumps(legacy_payload), encoding="utf-8")
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+            "--upgrade-invalid",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert json.loads((batch_dir / "batch.legacy.json").read_text(encoding="utf-8")) == legacy_payload
+    payload = json.loads((batch_dir / "batch.json").read_text(encoding="utf-8"))
+    BatchMeta.model_validate(payload)
+    assert payload["experiment_id"] == "E50004"
+    assert payload["batch_id"] == "E50004"
+    assert payload["git"] == {"commit": "b" * 40, "dirty": False, "branch": "legacy"}
+    assert payload["environment"] == {"python": "3.11"}
+    assert payload["provenance"]["legacy_backup"] == "batch.legacy.json"
