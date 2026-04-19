@@ -6,7 +6,7 @@ from research_infra.audit import audit_results_tree
 from research_infra.batch import backfill_batch_json, read_batch_json, upgrade_legacy_batch_json
 from research_infra.cache import rebuild_duckdb_cache
 from research_infra.scan import EXACT_BATCH_DIR_RE
-from research_infra.workspace import init_workspace, write_freeze_file
+from research_infra.workspace import SUPPORTED_FREEZE_POLICIES, init_workspace, write_freeze_file
 
 
 def main() -> int:
@@ -37,7 +37,7 @@ def main() -> int:
 
     freeze_parser = sub.add_parser("freeze")
     freeze_parser.add_argument("--workspace", required=True)
-    freeze_parser.add_argument("--policy", required=True)
+    freeze_parser.add_argument("--policy", required=True, choices=SUPPORTED_FREEZE_POLICIES)
 
     args = parser.parse_args()
     if args.command == "init":

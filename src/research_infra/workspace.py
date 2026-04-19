@@ -1,6 +1,14 @@
 import yaml
 from pathlib import Path
 
+FREEZE_POLICY_WRITES_ALLOWED = {
+    "backfill-only": [
+        "batch backfill",
+        "reproducibility documentation",
+    ],
+}
+SUPPORTED_FREEZE_POLICIES = tuple(FREEZE_POLICY_WRITES_ALLOWED)
+
 
 def init_workspace(workspace: Path) -> dict[str, object]:
     created: list[str] = []
@@ -13,7 +21,11 @@ def init_workspace(workspace: Path) -> dict[str, object]:
 
 
 def write_freeze_file(workspace: Path, policy: str) -> Path:
+    if policy not in FREEZE_POLICY_WRITES_ALLOWED:
+        raise ValueError(f"unsupported freeze policy: {policy}")
     target = workspace / "results/project_freeze.yml"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(yaml.safe_dump({"frozen": True, "policy": policy}, sort_keys=False), encoding="utf-8")
+    payload = {"frozen": True, "policy": policy}
+    payload["writes_allowed"] = FREEZE_POLICY_WRITES_ALLOWED[policy]
+    target.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return target
