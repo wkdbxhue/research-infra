@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from enum import Enum
 from typing import Any
 
@@ -35,6 +33,6 @@ class BatchMeta(BaseModel):
     @field_validator("experiment_id", "batch_id")
     @classmethod
     def validate_eid(cls, value: str) -> str:
-        if not value.startswith("E") or not value[1:].isdigit():
+        if len(value) != 6 or not value.startswith("E") or not value[1:].isdigit():
             raise ValueError("expected E##### identifier")
         return value
