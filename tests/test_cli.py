@@ -92,10 +92,10 @@ def test_cli_cache_rebuild_command(tmp_path: Path):
     assert result.returncode == 0
 
 
-def test_cli_cache_rebuild_command_resolves_relative_results_root_from_workspace(tmp_path: Path):
+def test_cli_cache_rebuild_command_resolves_relative_paths_from_workspace(tmp_path: Path):
     workspace = tmp_path / "workspace"
     _write_batch_with_index(workspace / "results")
-    db_path = tmp_path / "registry.duckdb"
+    db_path = workspace / "cache" / "registry.duckdb"
 
     result = run(
         [
@@ -109,7 +109,7 @@ def test_cli_cache_rebuild_command_resolves_relative_results_root_from_workspace
             "--results-root",
             "results",
             "--db-path",
-            str(db_path),
+            "cache/registry.duckdb",
         ],
         check=False,
         capture_output=True,
@@ -119,6 +119,7 @@ def test_cli_cache_rebuild_command_resolves_relative_results_root_from_workspace
     )
 
     assert result.returncode == 0
+    assert db_path.exists()
     with duckdb.connect(str(db_path)) as conn:
         rows = conn.execute("select batch_id, model_name, instance_name from runs").fetchall()
     assert rows == [("E50001", "M00001", "small-00")]

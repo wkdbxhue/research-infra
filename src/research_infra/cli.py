@@ -47,9 +47,12 @@ def main() -> int:
         return 0
     if args.command == "cache" and args.cache_command == "rebuild":
         results_root = Path(args.results_root)
+        db_path = Path(args.db_path)
         if not results_root.is_absolute() and args.workspace:
             results_root = Path(args.workspace) / results_root
-        rebuild_duckdb_cache(results_root, Path(args.db_path))
+        if not db_path.is_absolute() and args.workspace:
+            db_path = Path(args.workspace) / db_path
+        rebuild_duckdb_cache(results_root, db_path)
         return 0
     if args.command == "audit":
         findings = audit_results_tree(Path(args.workspace) / "results")
