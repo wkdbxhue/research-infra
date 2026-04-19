@@ -235,3 +235,41 @@ def test_cli_batch_backfill_upgrade_invalid_rewrites_legacy_payload(tmp_path: Pa
     assert payload["git"] == {"commit": "b" * 40, "dirty": False, "branch": "legacy"}
     assert payload["environment"] == {"python": "3.11"}
     assert payload["provenance"]["legacy_backup"] == "batch.legacy.json"
+
+
+def test_cli_batch_backfill_upgrade_invalid_rewrites_malformed_payload(tmp_path: Path):
+    batch_dir = tmp_path / "results" / "E50005"
+    batch_dir.mkdir(parents=True)
+    malformed_payload = "legacy-batch\nmissing-json\n"
+    (batch_dir / "batch.json").write_text(malformed_payload, encoding="utf-8")
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+            "--upgrade-invalid",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert (batch_dir / "batch.legacy.json").read_text(encoding="utf-8") == malformed_payload
+    payload = json.loads((batch_dir / "batch.json").read_text(encoding="utf-8"))
+    BatchMeta.model_validate(payload)
+    assert payload["experiment_id"] == "E50005"
+    assert payload["batch_id"] == "E50005"
+    assert payload["models"] == ["UNKNOWN"]
+    assert payload["instances"] == {"UNKNOWN": []}
+    assert payload["git"] == {"commit": None, "dirty": True}
+    assert payload["environment"] == {}
+    assert payload["provenance"]["legacy_backup"] == "batch.legacy.json"

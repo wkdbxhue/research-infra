@@ -84,6 +84,7 @@ def _canonical_backfill_payload(
     models: list[str],
     instances: dict[str, list[str]],
     legacy_payload: dict[str, Any] | None = None,
+    from_legacy_backup: bool = False,
 ) -> dict[str, object]:
     legacy_payload = legacy_payload or {}
     legacy_git = _legacy_mapping(legacy_payload.get("git"))
@@ -109,7 +110,7 @@ def _canonical_backfill_payload(
             "backfilled": True,
         },
     }
-    if legacy_payload:
+    if from_legacy_backup:
         payload["provenance"]["legacy_backup"] = LEGACY_BACKUP_NAME
         payload["provenance"]["legacy_source"] = "upgraded-invalid-batch-json"
     return payload
@@ -127,16 +128,21 @@ def upgrade_legacy_batch_json(batch_dir: Path) -> dict[str, object]:
         raise FileNotFoundError(target)
 
     raw_text = target.read_text(encoding="utf-8")
-    legacy_payload = json.loads(raw_text)
     backup_target = batch_dir / LEGACY_BACKUP_NAME
     if not backup_target.exists():
         backup_target.write_text(raw_text, encoding="utf-8")
+    try:
+        parsed_payload = json.loads(raw_text)
+    except json.JSONDecodeError:
+        parsed_payload = {}
+    legacy_payload = parsed_payload if isinstance(parsed_payload, dict) else {}
 
     payload = _canonical_backfill_payload(
         batch_dir,
         models=_usable_models(legacy_payload.get("models")) or ["UNKNOWN"],
         instances=_usable_instances(legacy_payload.get("instances")) or {"UNKNOWN": []},
         legacy_payload=legacy_payload,
+        from_legacy_backup=True,
     )
     BatchMeta.model_validate(payload)
     write_batch_json(target, payload)
