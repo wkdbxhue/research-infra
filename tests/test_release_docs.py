@@ -11,17 +11,22 @@ UPGRADE_DOC = ROOT / "docs" / "upgrade-0.1.0.md"
 RELEASE_VERSION = "0.1.0"
 CHANGELOG_ENTRY = "## 0.1.0 - 2026-04-19"
 UPGRADE_TITLE = "# research-infra 0.1.0 upgrade"
-CHANGELOG_BULLETS = {
-    "- initial filesystem-first contract release",
-    "- mvp CLI: init, batch backfill, cache rebuild, audit, freeze",
-    "- no reporting or stats modules yet",
-}
-UPGRADE_LINES = {
-    "This is an opt-in upgrade.",
-    "- projects pin the version they adopt",
-    "- no automatic behavior changes are pushed into old repos",
-    "- cache files remain disposable",
-}
+EXPECTED_CHANGELOG = """# Changelog
+
+## 0.1.0 - 2026-04-19
+
+- initial filesystem-first contract release
+- mvp CLI: init, batch backfill, cache rebuild, audit, freeze
+- no reporting or stats modules yet
+"""
+EXPECTED_UPGRADE_DOC = """# research-infra 0.1.0 upgrade
+
+This is an opt-in upgrade.
+
+- projects pin the version they adopt
+- no automatic behavior changes are pushed into old repos
+- cache files remain disposable
+"""
 
 
 def _extract(pattern: str, text: str, *, label: str) -> str:
@@ -52,7 +57,5 @@ def test_release_docs_pin_the_opt_in_contract_text():
     changelog_text = CHANGELOG.read_text(encoding="utf-8")
     upgrade_text = UPGRADE_DOC.read_text(encoding="utf-8")
 
-    for line in CHANGELOG_BULLETS:
-        assert line in changelog_text
-    for line in UPGRADE_LINES:
-        assert line in upgrade_text
+    assert changelog_text == EXPECTED_CHANGELOG
+    assert upgrade_text == EXPECTED_UPGRADE_DOC
