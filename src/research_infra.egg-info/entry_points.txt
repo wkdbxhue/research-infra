@@ -1,0 +1,2 @@
+[console_scripts]
+ri = research_infra.cli:main

@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: research-infra
+Version: 0.0.0
+Summary: Filesystem-first OR research infrastructure
+Requires-Python: >=3.10
+Requires-Dist: duckdb>=1.0.0
+Requires-Dist: pydantic>=2.7
+Requires-Dist: PyYAML>=6.0
