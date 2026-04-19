@@ -1,12 +1,17 @@
 import json
+import re
 from pathlib import Path
 from typing import Iterator
 
 from research_infra.schema import BatchMeta
 
+EXACT_BATCH_DIR_RE = re.compile(r"^E\d{5}$")
+
 
 def iter_batch_rows(results_root: Path) -> Iterator[dict[str, object]]:
     for batch_dir in sorted(results_root.glob("E*")):
+        if not batch_dir.is_dir() or not EXACT_BATCH_DIR_RE.match(batch_dir.name):
+            continue
         batch_json = batch_dir / "batch.json"
         if not batch_json.exists():
             continue

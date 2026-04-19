@@ -51,6 +51,39 @@ def test_iter_batch_rows_skips_malformed_batches(tmp_path: Path):
     ]
 
 
+def test_iter_batch_rows_ignores_non_batch_entries(tmp_path: Path):
+    good_batch = tmp_path / "E50001"
+    good_batch.mkdir()
+    (tmp_path / "E50014_driver.log").write_text("driver log\n", encoding="utf-8")
+    (tmp_path / "E50016_manual_fill").mkdir()
+    (good_batch / "batch.json").write_text(
+        """{
+  "experiment_id": "E50001",
+  "batch_id": "E50001",
+  "batch_type": "original",
+  "created_at": "2026-04-19T00:00:00+00:00",
+  "models": ["M00001"],
+  "instances": {"M00001": ["small-00"]},
+  "git": {"commit": "0123456789abcdef0123456789abcdef01234567", "dirty": false},
+  "provenance": {"infra_version": "0.0.0"}
+}
+""",
+        encoding="utf-8",
+    )
+
+    rows = list(iter_batch_rows(tmp_path))
+
+    assert rows == [
+        {
+            "experiment_id": "E50001",
+            "batch_id": "E50001",
+            "batch_type": "original",
+            "batch_dir": str(good_batch),
+            "model_count": 1,
+        }
+    ]
+
+
 def test_iter_batch_rows_raises_on_schema_invalid_batch(tmp_path: Path):
     batch_dir = tmp_path / "E50001"
     batch_dir.mkdir()
