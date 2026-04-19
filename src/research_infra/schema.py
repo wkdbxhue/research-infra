@@ -28,6 +28,7 @@ class BatchMeta(BaseModel):
     models: list[str] = Field(min_length=1)
     instances: dict[str, list[str]]
     git: GitProvenance
+    environment: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any]
 
     @field_validator("experiment_id", "batch_id")
