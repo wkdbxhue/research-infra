@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from research_infra.scan import iter_batch_rows
 
 
@@ -42,3 +44,20 @@ def test_iter_batch_rows_skips_malformed_batches(tmp_path: Path):
             "model_count": 1,
         }
     ]
+
+
+def test_iter_batch_rows_raises_on_schema_invalid_batch(tmp_path: Path):
+    batch_dir = tmp_path / "E50001"
+    batch_dir.mkdir()
+    (batch_dir / "batch.json").write_text(
+        """{
+  "experiment_id": "E50001",
+  "batch_id": "E50001",
+  "models": ["M00001"]
+}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(KeyError):
+        list(iter_batch_rows(tmp_path))

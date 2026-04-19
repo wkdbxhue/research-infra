@@ -17,5 +17,5 @@ def iter_batch_rows(results_root: Path) -> Iterator[dict[str, object]]:
                 "batch_dir": str(batch_dir),
                 "model_count": len(payload.get("models", [])),
             }
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             continue
