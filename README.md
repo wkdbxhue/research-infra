@@ -12,7 +12,7 @@ Filesystem-first OR research infrastructure.
 
 ## Contract Summary
 
-- canonical truth lives in filesystem artifacts
+- canonical truth in filesystem artifacts
 - cache is rebuildable
 - machine-written batch metadata uses `batch.json`
 
