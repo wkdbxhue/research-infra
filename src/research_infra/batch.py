@@ -25,7 +25,16 @@ CANONICAL_KEYS = {
     "provenance",
 }
 CANONICAL_ONLY_KEYS = {"batch_type", "provenance"}
-LEGACY_ONLY_KEYS = {"command", "total_trials", "execution_policy", "migration"}
+LEGACY_ONLY_KEYS = {
+    "command",
+    "total_trials",
+    "execution_policy",
+    "migration",
+    "instance_set_filter",
+    "cpu_pinning",
+    "resumed_at",
+    "resumed_trials",
+}
 LEGACY_COMPAT_KEYS = {
     "experiment_id",
     "batch_id",
