@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from typing import Iterator
 
+from research_infra.schema import BatchMeta
+
 
 def iter_batch_rows(results_root: Path) -> Iterator[dict[str, object]]:
     for batch_dir in sorted(results_root.glob("E*")):
@@ -10,12 +12,13 @@ def iter_batch_rows(results_root: Path) -> Iterator[dict[str, object]]:
             continue
         try:
             payload = json.loads(batch_json.read_text(encoding="utf-8"))
+            batch = BatchMeta.model_validate(payload)
             yield {
-                "experiment_id": payload["experiment_id"],
-                "batch_id": payload["batch_id"],
-                "batch_type": payload["batch_type"],
+                "experiment_id": batch.experiment_id,
+                "batch_id": batch.batch_id,
+                "batch_type": batch.batch_type.value,
                 "batch_dir": str(batch_dir),
-                "model_count": len(payload.get("models", [])),
+                "model_count": len(batch.models),
             }
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             continue
