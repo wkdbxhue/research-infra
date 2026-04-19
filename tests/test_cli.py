@@ -1,7 +1,10 @@
 import os
 import json
+import csv
 from pathlib import Path
 from subprocess import run
+
+import duckdb
 
 from research_infra.audit import audit_results_tree
 from research_infra.schema import BatchMeta
@@ -11,6 +14,56 @@ CLI_ENV = {
     **os.environ,
     "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
 }
+
+
+def _write_batch_with_index(results_root: Path, batch_id: str = "E50001") -> None:
+    batch_dir = results_root / batch_id
+    batch_dir.mkdir(parents=True)
+    (batch_dir / "batch.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": batch_id,
+                "batch_id": batch_id,
+                "batch_type": "original",
+                "created_at": "1970-01-01T00:00:00+00:00",
+                "models": ["M00001"],
+                "instances": {"M00001": ["small-00"]},
+                "git": {"commit": None, "dirty": True},
+                "environment": {},
+                "provenance": {"infra_version": "0.1.0"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with (batch_dir / "index.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "run_id",
+                "model_name",
+                "instance_name",
+                "param_alpha",
+                "objective",
+                "runtime",
+                "gap",
+                "status",
+                "validation_feasible",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "run_id": "R000001",
+                "model_name": "M00001",
+                "instance_name": "small-00",
+                "param_alpha": "0.4",
+                "objective": "123.5",
+                "runtime": "9.75",
+                "gap": "0.0",
+                "status": "2",
+                "validation_feasible": "True",
+            }
+        )
 
 
 def test_audit_accepts_minimal_fixture():
@@ -37,6 +90,38 @@ def test_cli_cache_rebuild_command(tmp_path: Path):
         text=True,
     )
     assert result.returncode == 0
+
+
+def test_cli_cache_rebuild_command_resolves_relative_results_root_from_workspace(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    _write_batch_with_index(workspace / "results")
+    db_path = tmp_path / "registry.duckdb"
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "cache",
+            "rebuild",
+            "--workspace",
+            str(workspace),
+            "--results-root",
+            "results",
+            "--db-path",
+            str(db_path),
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+        cwd="/home",
+    )
+
+    assert result.returncode == 0
+    with duckdb.connect(str(db_path)) as conn:
+        rows = conn.execute("select batch_id, model_name, instance_name from runs").fetchall()
+    assert rows == [("E50001", "M00001", "small-00")]
 
 
 def test_cli_init_command(tmp_path: Path):
@@ -186,6 +271,38 @@ def test_cli_batch_backfill_ignores_non_directory_entries(tmp_path: Path):
     payload = json.loads((batch_dir / "batch.json").read_text(encoding="utf-8"))
     BatchMeta.model_validate(payload)
     assert payload["experiment_id"] == "E50014"
+
+
+def test_cli_batch_backfill_ignores_non_batch_directories(tmp_path: Path):
+    results_root = tmp_path / "results"
+    manual_dir = results_root / "E50016_manual_fill"
+    manual_dir.mkdir(parents=True)
+    batch_dir = results_root / "E50016"
+    batch_dir.mkdir()
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert not (manual_dir / "batch.json").exists()
+    payload = json.loads((batch_dir / "batch.json").read_text(encoding="utf-8"))
+    BatchMeta.model_validate(payload)
+    assert payload["experiment_id"] == "E50016"
 
 
 def test_cli_batch_backfill_omits_invalid_upgrade_without_flag(tmp_path: Path):

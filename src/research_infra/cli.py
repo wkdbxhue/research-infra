@@ -5,6 +5,7 @@ from pathlib import Path
 from research_infra.audit import audit_results_tree
 from research_infra.batch import backfill_batch_json, read_batch_json, upgrade_legacy_batch_json
 from research_infra.cache import rebuild_duckdb_cache
+from research_infra.scan import EXACT_BATCH_DIR_RE
 from research_infra.workspace import init_workspace, write_freeze_file
 
 
@@ -45,7 +46,10 @@ def main() -> int:
             print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
     if args.command == "cache" and args.cache_command == "rebuild":
-        rebuild_duckdb_cache(Path(args.results_root), Path(args.db_path))
+        results_root = Path(args.results_root)
+        if not results_root.is_absolute() and args.workspace:
+            results_root = Path(args.workspace) / results_root
+        rebuild_duckdb_cache(results_root, Path(args.db_path))
         return 0
     if args.command == "audit":
         findings = audit_results_tree(Path(args.workspace) / "results")
@@ -58,7 +62,7 @@ def main() -> int:
     if args.command == "batch" and args.batch_command == "backfill":
         results_root = Path(args.workspace) / args.results_root
         for batch_dir in sorted(results_root.glob("E*")):
-            if not batch_dir.is_dir():
+            if not batch_dir.is_dir() or not EXACT_BATCH_DIR_RE.match(batch_dir.name):
                 continue
             batch_json = batch_dir / "batch.json"
             if not batch_json.exists():
