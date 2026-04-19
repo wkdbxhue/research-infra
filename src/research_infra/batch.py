@@ -104,9 +104,8 @@ def _is_legacy_shaped_payload(payload: dict[str, Any]) -> bool:
     keys = set(payload)
     if keys & CANONICAL_ONLY_KEYS:
         return False
-    if keys & LEGACY_ONLY_KEYS:
-        return True
-    if not keys:
+    legacy_markers = keys & LEGACY_ONLY_KEYS
+    if not legacy_markers:
         return False
     return keys <= (LEGACY_COMPAT_KEYS | LEGACY_ONLY_KEYS)
 

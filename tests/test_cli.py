@@ -229,6 +229,8 @@ def test_cli_batch_backfill_upgrade_invalid_rewrites_legacy_payload(tmp_path: Pa
     batch_dir.mkdir(parents=True)
     legacy_payload = {
         "experiment_id": "legacy-run",
+        "command": "python main.py --config avsr.yml",
+        "total_trials": 8,
         "models": ["M00004"],
         "instances": {"M00004": ["small-03"]},
         "git": {"commit": "b" * 40, "dirty": False, "branch": "legacy"},
@@ -264,6 +266,44 @@ def test_cli_batch_backfill_upgrade_invalid_rewrites_legacy_payload(tmp_path: Pa
     assert payload["git"] == {"commit": "b" * 40, "dirty": False, "branch": "legacy"}
     assert payload["environment"] == {"python": "3.11"}
     assert payload["provenance"]["legacy_backup"] == "batch.legacy.json"
+
+
+def test_cli_batch_backfill_upgrade_invalid_refuses_shared_key_only_payload(tmp_path: Path):
+    batch_dir = tmp_path / "results" / "E50009"
+    batch_dir.mkdir(parents=True)
+    raw_text = json.dumps(
+        {
+            "experiment_id": "legacy-run",
+            "models": ["M00004"],
+            "instances": {"M00004": ["small-03"]},
+            "git": {"commit": "b" * 40, "dirty": False, "branch": "legacy"},
+            "environment": {"python": "3.11"},
+        }
+    )
+    (batch_dir / "batch.json").write_text(raw_text, encoding="utf-8")
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+            "--upgrade-invalid",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert (batch_dir / "batch.json").read_text(encoding="utf-8") == raw_text
+    assert not (batch_dir / "batch.legacy.json").exists()
 
 
 def test_cli_batch_backfill_upgrade_invalid_refuses_malformed_payload(tmp_path: Path):

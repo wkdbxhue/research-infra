@@ -58,6 +58,8 @@ def test_upgrade_legacy_batch_json_preserves_backup_and_signal(tmp_path: Path):
         "experiment_id": "not-an-eid",
         "batch_id": "E59999",
         "created_at": "2026-04-19T00:00:00+00:00",
+        "command": "python main.py --config avsr.yml",
+        "total_trials": 12,
         "models": ["M00003"],
         "instances": {"M00003": ["small-02"]},
         "git": {"commit": "a" * 40, "branch": "feature/legacy"},
@@ -81,6 +83,26 @@ def test_upgrade_legacy_batch_json_preserves_backup_and_signal(tmp_path: Path):
     assert upgraded["provenance"]["backfilled"] is True
     assert upgraded["provenance"]["legacy_backup"] == "batch.legacy.json"
     BatchMeta.model_validate(upgraded)
+
+
+def test_upgrade_legacy_batch_json_refuses_shared_key_only_payload(tmp_path: Path):
+    batch_dir = tmp_path / "results/E50013"
+    batch_dir.mkdir(parents=True)
+    ambiguous_payload = {
+        "experiment_id": "legacy-run",
+        "models": ["M00004"],
+        "instances": {"M00004": ["small-03"]},
+        "git": {"commit": "b" * 40, "dirty": False, "branch": "legacy"},
+        "environment": {"python": "3.11"},
+    }
+    raw_text = json.dumps(ambiguous_payload)
+    (batch_dir / "batch.json").write_text(raw_text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="does not look like a legacy batch"):
+        upgrade_legacy_batch_json(batch_dir)
+
+    assert (batch_dir / "batch.json").read_text(encoding="utf-8") == raw_text
+    assert not (batch_dir / "batch.legacy.json").exists()
 
 
 def test_upgrade_legacy_batch_json_refuses_malformed_legacy_payload(tmp_path: Path):
