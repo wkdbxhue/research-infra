@@ -7,9 +7,27 @@ from pathlib import Path
 
 
 def collect_git_provenance(repo_root: Path) -> dict[str, object]:
-    commit = subprocess.check_output(["git", "-C", str(repo_root), "rev-parse", "HEAD"], text=True).strip()
-    dirty = bool(subprocess.check_output(["git", "-C", str(repo_root), "status", "--porcelain"], text=True).strip())
-    branch = subprocess.check_output(["git", "-C", str(repo_root), "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
+    status = subprocess.check_output(
+        ["git", "-C", str(repo_root), "status", "--porcelain=v2", "--branch"],
+        text=True,
+    )
+
+    commit: str | None = None
+    branch: str | None = None
+    dirty = False
+
+    for line in status.splitlines():
+        if line.startswith("# branch.oid "):
+            commit = line.removeprefix("# branch.oid ").strip()
+            if commit == "(initial)":
+                commit = None
+        elif line.startswith("# branch.head "):
+            branch = line.removeprefix("# branch.head ").strip()
+            if branch == "detached":
+                branch = "HEAD"
+        elif line and not line.startswith("#"):
+            dirty = True
+
     return {"commit": commit, "dirty": dirty, "branch": branch}
 
 
