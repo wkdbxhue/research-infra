@@ -13,6 +13,28 @@ EID_RE = re.compile(r"^E(\d{5})$")
 INFRA_VERSION = "0.1.0"
 EPOCH_TIMESTAMP = "1970-01-01T00:00:00+00:00"
 LEGACY_BACKUP_NAME = "batch.legacy.json"
+CANONICAL_KEYS = {
+    "experiment_id",
+    "batch_id",
+    "batch_type",
+    "created_at",
+    "models",
+    "instances",
+    "git",
+    "environment",
+    "provenance",
+}
+CANONICAL_ONLY_KEYS = {"batch_type", "provenance"}
+LEGACY_ONLY_KEYS = {"command", "total_trials", "execution_policy", "migration"}
+LEGACY_COMPAT_KEYS = {
+    "experiment_id",
+    "batch_id",
+    "created_at",
+    "models",
+    "instances",
+    "git",
+    "environment",
+}
 
 
 def allocate_experiment_id(results_root: Path, *, start: int = 50001) -> str:
@@ -78,6 +100,24 @@ def _legacy_mapping(value: Any) -> dict[str, Any]:
     return {}
 
 
+def _is_legacy_shaped_payload(payload: dict[str, Any]) -> bool:
+    keys = set(payload)
+    if keys & LEGACY_ONLY_KEYS:
+        return True
+    if keys & CANONICAL_ONLY_KEYS:
+        return False
+    if not keys:
+        return False
+    return keys <= (LEGACY_COMPAT_KEYS | LEGACY_ONLY_KEYS)
+
+
+def _looks_like_canonical_raw_text(raw_text: str) -> bool:
+    if any(f'"{key}"' in raw_text for key in CANONICAL_ONLY_KEYS):
+        return True
+    canonical_hits = sum(1 for key in CANONICAL_KEYS if f'"{key}"' in raw_text)
+    return canonical_hits >= 4
+
+
 def _canonical_backfill_payload(
     batch_dir: Path,
     *,
@@ -129,13 +169,20 @@ def upgrade_legacy_batch_json(batch_dir: Path) -> dict[str, object]:
 
     raw_text = target.read_text(encoding="utf-8")
     backup_target = batch_dir / LEGACY_BACKUP_NAME
-    if not backup_target.exists():
-        backup_target.write_text(raw_text, encoding="utf-8")
+    if backup_target.exists():
+        raise ValueError(f"existing legacy backup at {backup_target}; refusing to overwrite invalid batch.json")
     try:
         parsed_payload = json.loads(raw_text)
     except json.JSONDecodeError:
-        parsed_payload = {}
-    legacy_payload = parsed_payload if isinstance(parsed_payload, dict) else {}
+        if _looks_like_canonical_raw_text(raw_text):
+            raise ValueError(f"{target} does not look like a legacy batch; refusing upgrade")
+        legacy_payload: dict[str, Any] = {}
+    else:
+        if not isinstance(parsed_payload, dict) or not _is_legacy_shaped_payload(parsed_payload):
+            raise ValueError(f"{target} does not look like a legacy batch; refusing upgrade")
+        legacy_payload = parsed_payload
+
+    backup_target.write_text(raw_text, encoding="utf-8")
 
     payload = _canonical_backfill_payload(
         batch_dir,

@@ -155,6 +155,35 @@ def test_cli_batch_backfill_command(tmp_path: Path):
     }
 
 
+def test_cli_batch_backfill_omits_invalid_upgrade_without_flag(tmp_path: Path):
+    batch_dir = tmp_path / "results" / "E50006"
+    batch_dir.mkdir(parents=True)
+    legacy_payload = '{"command": "python main.py", "total_trials": 10}\n'
+    (batch_dir / "batch.json").write_text(legacy_payload, encoding="utf-8")
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert (batch_dir / "batch.json").read_text(encoding="utf-8") == legacy_payload
+    assert not (batch_dir / "batch.legacy.json").exists()
+
+
 def test_cli_batch_backfill_upgrade_invalid_keeps_valid_payload(tmp_path: Path):
     batch_dir = tmp_path / "results" / "E50003"
     batch_dir.mkdir(parents=True)
@@ -273,3 +302,45 @@ def test_cli_batch_backfill_upgrade_invalid_rewrites_malformed_payload(tmp_path:
     assert payload["git"] == {"commit": None, "dirty": True}
     assert payload["environment"] == {}
     assert payload["provenance"]["legacy_backup"] == "batch.legacy.json"
+
+
+def test_cli_batch_backfill_upgrade_invalid_refuses_damaged_canonical_payload(tmp_path: Path):
+    batch_dir = tmp_path / "results" / "E50007"
+    batch_dir.mkdir(parents=True)
+    raw_text = json.dumps(
+        {
+            "experiment_id": "broken",
+            "batch_id": "E50007",
+            "batch_type": "backfill",
+            "created_at": "1970-01-01T00:00:00+00:00",
+            "models": ["UNKNOWN"],
+            "instances": {"UNKNOWN": []},
+            "git": {"commit": None, "dirty": True},
+            "environment": {},
+            "provenance": {"infra_version": "0.1.0", "backfilled": True},
+        }
+    )
+    (batch_dir / "batch.json").write_text(raw_text, encoding="utf-8")
+
+    result = run(
+        [
+            "python",
+            "-m",
+            "research_infra.cli",
+            "batch",
+            "backfill",
+            "--workspace",
+            str(tmp_path),
+            "--results-root",
+            "results",
+            "--upgrade-invalid",
+        ],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert (batch_dir / "batch.json").read_text(encoding="utf-8") == raw_text
+    assert not (batch_dir / "batch.legacy.json").exists()
