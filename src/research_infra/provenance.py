@@ -23,7 +23,7 @@ def collect_git_provenance(repo_root: Path) -> dict[str, object]:
                 commit = None
         elif line.startswith("# branch.head "):
             branch = line.removeprefix("# branch.head ").strip()
-            if branch == "detached":
+            if branch in {"detached", "(detached)"}:
                 branch = "HEAD"
         elif line and not line.startswith("#"):
             dirty = True

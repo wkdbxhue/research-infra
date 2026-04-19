@@ -45,3 +45,27 @@ def test_collect_git_provenance_uses_single_status_snapshot(tmp_path: Path, monk
         "dirty": True,
         "branch": "main",
     }
+
+
+def test_collect_git_provenance_normalizes_detached_head(tmp_path: Path, monkeypatch):
+    status = "\n".join(
+        [
+            "# branch.oid 0123456789abcdef0123456789abcdef01234567",
+            "# branch.head (detached)",
+        ]
+    )
+
+    def fake_check_output(cmd, text):
+        assert cmd == ["git", "-C", str(tmp_path), "status", "--porcelain=v2", "--branch"]
+        assert text is True
+        return status
+
+    monkeypatch.setattr(subprocess, "check_output", fake_check_output)
+
+    payload = collect_git_provenance(tmp_path)
+
+    assert payload == {
+        "commit": "0123456789abcdef0123456789abcdef01234567",
+        "dirty": False,
+        "branch": "HEAD",
+    }
