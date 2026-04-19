@@ -5,6 +5,7 @@ from pathlib import Path
 from subprocess import run
 
 import duckdb
+import yaml
 
 from research_infra.audit import audit_results_tree
 from research_infra.schema import BatchMeta
@@ -146,7 +147,27 @@ def test_cli_freeze_command(tmp_path: Path):
         text=True,
     )
     assert result.returncode == 0
-    assert (tmp_path / "results/project_freeze.yml").exists()
+    assert yaml.safe_load((tmp_path / "results/project_freeze.yml").read_text(encoding="utf-8")) == {
+        "frozen": True,
+        "policy": "backfill-only",
+        "writes_allowed": [
+            "batch backfill",
+            "reproducibility documentation",
+        ],
+    }
+
+
+def test_cli_freeze_command_rejects_unknown_policy(tmp_path: Path):
+    result = run(
+        ["python", "-m", "research_infra.cli", "freeze", "--workspace", str(tmp_path), "--policy", "custom"],
+        check=False,
+        capture_output=True,
+        env=CLI_ENV,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "invalid choice" in result.stderr
+    assert not (tmp_path / "results/project_freeze.yml").exists()
 
 
 def test_cli_audit_command(tmp_path: Path):
