@@ -32,3 +32,11 @@ def test_backfill_batch_json_uses_existing_run_tree(tmp_path: Path):
     payload = backfill_batch_json(batch_dir, models=["M00002"], instances={"M00002": ["small-01"]})
     assert payload["experiment_id"] == "E50004"
     assert (batch_dir / "batch.json").exists()
+
+
+def test_repo_gitignore_covers_generated_artifacts():
+    patterns = (Path(__file__).resolve().parents[1] / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert ".pytest_cache/" in patterns
+    assert "__pycache__/" in patterns
+    assert "*.pyc" in patterns
+    assert "src/*.egg-info/" in patterns
