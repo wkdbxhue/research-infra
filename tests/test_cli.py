@@ -258,7 +258,7 @@ def test_cli_batch_backfill_command(tmp_path: Path):
         "instances": {"UNKNOWN": []},
         "git": {"commit": None, "dirty": True},
         "environment": {},
-        "provenance": {"infra_version": "0.1.0", "backfilled": True},
+        "provenance": {"infra_version": "0.1.1", "backfilled": True},
     }
 
 

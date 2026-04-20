@@ -2,6 +2,14 @@
 
 Filesystem-first OR research infrastructure.
 
+## Stable Install
+
+```bash
+pip install "research-infra @ git+https://github.com/wkdbxhue/research-infra.git@v0.1.1"
+```
+
+For a new project bootstrap and retrofit flow, see `docs/use-guide.md`.
+
 ## Planned P1 Commands
 
 - `ri init`
