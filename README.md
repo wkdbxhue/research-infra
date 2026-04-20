@@ -13,6 +13,7 @@ For a new project bootstrap and retrofit flow, see `docs/use-guide.md`.
 ## Planned P1 Commands
 
 - `ri init`
+- `ri memory init`
 - `ri batch new`
 - `ri batch backfill`
 - `ri cache rebuild`

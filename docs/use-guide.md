@@ -30,8 +30,17 @@ This creates:
 - `src/models/`
 - `src/config/`
 
+Bootstrap the machine-local two-layer memory layout for `token-savior`:
+
+```bash
+ri memory init --workspace . --json
+```
+
+This creates machine-local state under `~/.codex/token-savior/` and keeps the repo tree clean.
+
 ## Core commands
 
+- `ri memory show --workspace . --json`
 - `ri audit --workspace . --json`
 - `ri cache rebuild --workspace . --results-root results --db-path results/_cache/registry.duckdb`
 - `ri freeze --workspace . --policy backfill-only`

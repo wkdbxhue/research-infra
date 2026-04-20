@@ -5,6 +5,7 @@ from pathlib import Path
 from research_infra.audit import audit_results_tree
 from research_infra.batch import backfill_batch_json, read_batch_json, upgrade_legacy_batch_json
 from research_infra.cache import rebuild_duckdb_cache
+from research_infra.memory import bootstrap_token_savior_layout, resolve_token_savior_layout
 from research_infra.scan import EXACT_BATCH_DIR_RE
 from research_infra.workspace import SUPPORTED_FREEZE_POLICIES, init_workspace, write_freeze_file
 
@@ -38,6 +39,19 @@ def main() -> int:
     freeze_parser = sub.add_parser("freeze")
     freeze_parser.add_argument("--workspace", required=True)
     freeze_parser.add_argument("--policy", required=True, choices=SUPPORTED_FREEZE_POLICIES)
+
+    memory_parser = sub.add_parser("memory")
+    memory_sub = memory_parser.add_subparsers(dest="memory_command", required=True)
+
+    memory_show_parser = memory_sub.add_parser("show")
+    memory_show_parser.add_argument("--workspace", required=True)
+    memory_show_parser.add_argument("--codex-home", required=False)
+    memory_show_parser.add_argument("--json", action="store_true")
+
+    memory_init_parser = memory_sub.add_parser("init")
+    memory_init_parser.add_argument("--workspace", required=True)
+    memory_init_parser.add_argument("--codex-home", required=False)
+    memory_init_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args()
     if args.command == "init":
@@ -76,6 +90,35 @@ def main() -> int:
         return 0
     if args.command == "freeze":
         write_freeze_file(Path(args.workspace), args.policy)
+        return 0
+    if args.command == "memory" and args.memory_command == "show":
+        layout = resolve_token_savior_layout(
+            Path(args.workspace),
+            codex_home=Path(args.codex_home) if args.codex_home else None,
+        )
+        payload = layout.to_dict()
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0
+        print(payload["workspace_manifest"])
+        return 0
+    if args.command == "memory" and args.memory_command == "init":
+        codex_home = Path(args.codex_home) if args.codex_home else None
+        layout = resolve_token_savior_layout(Path(args.workspace), codex_home=codex_home)
+        created: list[str] = []
+        for target in [layout.global_db.parent, layout.workspace_db.parent, layout.checkpoint_db.parent]:
+            if not target.exists():
+                target.mkdir(parents=True, exist_ok=True)
+                created.append(str(target))
+        layout = bootstrap_token_savior_layout(Path(args.workspace), codex_home=codex_home)
+        payload = layout.to_dict()
+        payload["created"] = created
+        payload["workspace_db_dir"] = str(layout.workspace_db.parent)
+        payload["checkpoint_db_dir"] = str(layout.checkpoint_db.parent)
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0
+        print(payload["workspace_manifest"])
         return 0
     return 2
 
