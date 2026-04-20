@@ -10,7 +10,7 @@ import fcntl
 from research_infra.schema import BatchMeta
 
 EID_RE = re.compile(r"^E(\d{5})$")
-INFRA_VERSION = "0.1.0"
+INFRA_VERSION = "0.1.1"
 EPOCH_TIMESTAMP = "1970-01-01T00:00:00+00:00"
 LEGACY_BACKUP_NAME = "batch.legacy.json"
 CANONICAL_KEYS = {

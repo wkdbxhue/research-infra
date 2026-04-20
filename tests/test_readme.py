@@ -12,3 +12,5 @@ def test_readme_lists_phase1_commands_and_non_goals():
     assert "ri cache rebuild" in text
     assert "ri audit" in text
     assert "Non-goals for P0" in text
+    assert 'pip install "research-infra @ git+https://github.com/wkdbxhue/research-infra.git@v0.1.1"' in text
+    assert "docs/use-guide.md" in text
