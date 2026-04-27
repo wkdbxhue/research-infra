@@ -135,7 +135,20 @@ def test_cli_init_command(tmp_path: Path):
         text=True,
     )
     assert result.returncode == 0
-    assert (tmp_path / "results").exists()
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "workspace": str(tmp_path),
+        "created": [
+            "results",
+            "results/_cache",
+            "docs",
+            "src/models",
+            "src/config",
+            "src/engines",
+        ],
+    }
+    for rel in payload["created"]:
+        assert (tmp_path / rel).is_dir()
 
 
 def test_cli_freeze_command(tmp_path: Path):

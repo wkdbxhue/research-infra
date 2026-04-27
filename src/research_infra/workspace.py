@@ -1,6 +1,15 @@
 import yaml
 from pathlib import Path
 
+SCAFFOLD_DIRS = (
+    "results",
+    "results/_cache",
+    "docs",
+    "src/models",
+    "src/config",
+    "src/engines",
+)
+
 FREEZE_POLICY_WRITES_ALLOWED = {
     "backfill-only": [
         "batch backfill",
@@ -12,7 +21,7 @@ SUPPORTED_FREEZE_POLICIES = tuple(FREEZE_POLICY_WRITES_ALLOWED)
 
 def init_workspace(workspace: Path) -> dict[str, object]:
     created: list[str] = []
-    for rel in ["results", "results/_cache", "docs", "src/models", "src/config"]:
+    for rel in SCAFFOLD_DIRS:
         target = workspace / rel
         if not target.exists():
             target.mkdir(parents=True, exist_ok=True)
