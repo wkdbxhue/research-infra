@@ -33,6 +33,7 @@ This creates:
 - `docs/`
 - `src/models/`
 - `src/config/`
+- `src/engines/`
 
 Bootstrap the machine-local two-layer memory layout for `token-savior`:
 

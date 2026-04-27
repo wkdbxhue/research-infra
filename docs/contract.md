@@ -8,6 +8,14 @@
 - `results/E#####/runs/R######/*`: run truth
 - `results/paper*.yml`: hand-authored reporting manifests
 
+## Source Layout
+
+- `src/models/`: lineage-visible model wrappers and exact model entrypoints
+- `src/config/`: hand-authored config truth
+- `src/engines/`: reusable project-specific algorithm components
+- `src/utils/`: project support code that is not model lineage or engine logic
+- `src/engines/` subdirectories are project-owned and are not forced by `ri init`
+
 ## Disposable Cache
 
 - `results/_cache/*.duckdb`: rebuildable
